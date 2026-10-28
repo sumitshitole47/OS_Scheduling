@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resource Allocation Workbench | OS Lab</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5efe5;
+      --panel: #fffdf9;
+      --panel-alt: #f0e5d5;
+      --ink: #34291e;
+      --muted: #847666;
+      --line: #e6d9c7;
+      --brown: #855c3b;
+      --brown-dark: #61452f;
+      --brown-soft: #ead9c3;
+      --green: #376b4a;
+      --green-bg: #e8f1e8;
+      --red: #9c4938;
+      --red-bg: #f8e9e3;
+      --shadow: 0 8px 26px rgba(79, 56, 35, .07);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 14px/1.5 "Segoe UI", Arial, sans-serif;
+    }
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+    .shell { max-width: 1440px; margin: 0 auto; padding: 26px 34px 52px; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--brown);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0; font-size: clamp(24px, 3vw, 34px); letter-spacing: -.035em; line-height: 1.15; }
+    .subtitle { margin: 9px 0 0; color: var(--muted); font-size: 14px; }
+    .header-meta { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; justify-content: flex-end; }
+    .tag, .status-pill {
+      display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px;
+      border: 1px solid var(--line); border-radius: 999px; background: var(--panel);
+      color: var(--brown-dark); font-size: 11px; font-weight: 750; white-space: nowrap;
+    }
+    .status-dot { width: 7px; height: 7px; background: #4a865b; border-radius: 50%; }
+    .metrics {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 22px 0;
+    }
+    .metric, .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow);
+    }
+    .metric { padding: 16px 18px; min-height: 102px; }
+    .metric-label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    .metric-value { margin-top: 5px; font-size: 25px; font-weight: 800; letter-spacing: -.03em; }
+    .metric-note { color: var(--muted); font-size: 11px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, .9fr); gap: 18px; align-items: start; }
+    .stack { display: grid; gap: 18px; }
+    .card { padding: 19px 20px; min-width: 0; }
+    .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 15px; }
+    h2 { margin: 0; font-size: 16px; letter-spacing: -.015em; }
+    h3 { margin: 0; font-size: 13px; }
+    .section-note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .resource-line { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 13px; }
+    .resource-chip {
+      padding: 5px 9px; border-radius: 7px; background: var(--panel-alt); color: var(--brown-dark);
+      font-size: 11px; font-weight: 700;
+    }
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 9px 8px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
+    td { padding: 10px 8px; border-top: 1px solid #eee6da; font-size: 12px; white-space: nowrap; }
+    .matrix-table td:not(:first-child) { font-family: Consolas, "Courier New", monospace; font-weight: 700; }
+    .task-label { color: var(--brown-dark); font-weight: 800; }
+    .vector { display: inline-flex; gap: 7px; }
+    .vector span { min-width: 12px; text-align: center; }
+    .need-value { color: var(--brown); }
+    .safety-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      padding: 12px 14px; border: 1px solid #c9ddca; border-radius: 9px; background: var(--green-bg);
+      color: var(--green); font-weight: 800; margin-bottom: 14px;
+    }
+    .safety-bar.unsafe { background: var(--red-bg); border-color: #e9c8bd; color: var(--red); }
+    .sequence { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+    .sequence-item { padding: 5px 9px; background: #fff; border: 1px solid #c9ddca; border-radius: 6px; font: 700 11px Consolas, monospace; }
+    .arrow { color: #78937c; font-weight: 700; }
+    .trace { display: grid; gap: 8px; }
+    .trace-step { display: grid; grid-template-columns: 30px 1fr; gap: 9px; align-items: start; padding: 9px 10px; border-radius: 8px; background: #f8f4ec; }
+    .step-number { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; background: var(--brown-soft); color: var(--brown-dark); font-size: 11px; font-weight: 800; }
+    .trace-copy { min-width: 0; font-size: 12px; }
+    .trace-copy strong { display: block; margin-bottom: 2px; }
+    .trace-copy span { color: var(--muted); }
+    .request-form { display: grid; grid-template-columns: 1fr repeat(3, 70px) auto; gap: 8px; align-items: end; margin-top: 14px; }
+    .field { display: grid; gap: 4px; }
+    .field label { color: var(--muted); font-size: 10px; font-weight: 750; }
+    select, input {
+      width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid var(--line); border-radius: 7px;
+      background: #fff; color: var(--ink); outline: none;
+    }
+    select:focus, input:focus { border-color: #a77c54; box-shadow: 0 0 0 3px rgba(167,124,84,.13); }
+    .btn {
+      border: 0; border-radius: 7px; padding: 9px 12px; background: var(--brown);
+      color: #fffaf3; font-size: 11px; font-weight: 800; white-space: nowrap;
+    }
+    .btn:hover { background: var(--brown-dark); }
+    .btn.secondary { background: #efe5d8; color: var(--brown-dark); border: 1px solid var(--line); }
+    .btn.secondary:hover { background: #e8d8c4; }
+    .request-outcome { display: none; margin-top: 12px; padding: 11px 12px; border-radius: 8px; background: var(--green-bg); color: var(--green); font-size: 12px; }
+    .request-outcome.show { display: block; }
+    .request-outcome.denied { background: var(--red-bg); color: var(--red); }
+    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .segmented { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: #f8f4ec; }
+    .segment { border: 0; border-radius: 6px; padding: 6px 9px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 800; }
+    .segment.active { background: #fff; color: var(--brown-dark); box-shadow: 0 1px 4px rgba(60,40,20,.12); }
+    .gantt { display: grid; gap: 9px; margin-top: 14px; }
+    .gantt-row { display: grid; grid-template-columns: 35px minmax(0,1fr) 44px; gap: 9px; align-items: center; }
+    .gantt-name { font: 800 11px Consolas, monospace; color: var(--brown-dark); }
+    .gantt-track { height: 23px; position: relative; border-radius: 5px; background: #f2ece2; overflow: hidden; }
+    .gantt-bar {
+      position: absolute; top: 0; bottom: 0; min-width: 3px; display: flex; align-items: center; padding: 0 6px;
+      border-radius: 5px; background: #a8794e; color: #fffaf3; font-size: 10px; font-weight: 800; overflow: hidden;
+    }
+    .gantt-time { color: var(--muted); font: 10px Consolas, monospace; text-align: right; }
+    .axis { display: flex; justify-content: space-between; margin: 4px 53px 0 44px; color: var(--muted); font: 10px Consolas, monospace; }
+    .memory-list { display: grid; gap: 8px; }
+    .memory-row { display: grid; grid-template-columns: 36px minmax(0,1fr) auto; gap: 9px; align-items: center; padding: 9px 10px; border: 1px solid #eee6da; border-radius: 8px; }
+    .memory-task { font: 800 11px Consolas, monospace; color: var(--brown-dark); }
+    .memory-detail { font-size: 11px; }
+    .memory-detail strong { display: block; }
+    .memory-detail span { color: var(--muted); }
+    .memory-status { padding: 4px 7px; border-radius: 5px; background: var(--green-bg); color: var(--green); font-size: 10px; font-weight: 800; }
+    .memory-status.wait { background: var(--red-bg); color: var(--red); }
+    .benchmark-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+    .benchmark-item { padding: 11px; border-radius: 8px; background: #f8f4ec; }
+    .benchmark-item span { display: block; color: var(--muted); font-size: 10px; }
+    .benchmark-item strong { display: block; margin-top: 3px; font-size: 15px; }
+    .footnote { color: var(--muted); font-size: 10px; margin: 10px 0 0; }
+    .system-note { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-top: 18px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,253,249,.7); color: var(--muted); font-size: 11px; }
+    .system-note strong { color: var(--brown-dark); }
+    [hidden] { display: none !important; }
+    .workspace-nav { display: flex; gap: 7px; padding: 4px; background: var(--panel-alt); border: 1px solid var(--line); border-radius: 9px; }
+    .workspace-tab { border: 0; border-radius: 6px; padding: 8px 11px; background: transparent; color: var(--brown-dark); font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .workspace-tab.active { background: var(--panel); box-shadow: 0 1px 5px rgba(60,40,20,.12); }
+    .custom-config { display: grid; grid-template-columns: repeat(3,minmax(100px,1fr)) minmax(190px,2fr); gap: 10px; }
+    .custom-task-list { display: grid; gap: 11px; }
+    .custom-task-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #fffefa; }
+    .custom-task-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .custom-task-head strong { color: var(--brown-dark); font-size: 12px; }
+    .custom-task-grid { display: grid; grid-template-columns: repeat(6,minmax(80px,1fr)); gap: 8px; }
+    .custom-task-grid .field label { font-size: 9px; }
+    .custom-task-grid input { padding: 7px; font-size: 11px; }
+    .custom-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 13px; }
+    .custom-actions > div { display: flex; gap: 8px; flex-wrap: wrap; }
+    .form-message { display: none; margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--red-bg); color: var(--red); font-size: 12px; }
+    .form-message.show { display: block; }
+    .form-message.notice { background: var(--panel-alt); color: var(--brown-dark); }
+    .custom-results { display: grid; gap: 18px; margin-top: 18px; }
+    .custom-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+    .custom-result-grid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(280px,.8fr); gap: 18px; align-items: start; }
+    .custom-inline-fields { display: grid; grid-template-columns: 1.1fr repeat(3,70px) auto; gap: 8px; align-items: end; margin-top: 12px; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2,1fr); }
+      .custom-task-grid { grid-template-columns: repeat(3,minmax(80px,1fr)); }
+      .custom-result-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .shell { padding: 19px 14px 35px; }
+      .topbar { flex-direction: column; }
+      .header-meta { justify-content: flex-start; }
+      .workspace-tab { padding: 7px 8px; }
+      .metrics { gap: 9px; }
+      .metric { padding: 13px; min-height: 89px; }
+      .metric-value { font-size: 21px; }
+      .card { padding: 15px 13px; }
+      .request-form { grid-template-columns: repeat(3, 1fr); }
+      .request-form .field:first-child { grid-column: 1 / -1; }
+      .request-form .btn { grid-column: 1 / -1; }
+      .custom-config { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .custom-config .field:last-child { grid-column: 1 / -1; }
+      .custom-task-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .custom-inline-fields { grid-template-columns: repeat(3,1fr); }
+      .custom-inline-fields .field:first-child, .custom-inline-fields .btn { grid-column: 1 / -1; }
+      .custom-metrics { grid-template-columns: 1fr; }
+      .card-head { flex-direction: column; }
+      .system-note { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">CS2303L · Operating Systems · Experiment 9</p>
+        <h1>Resource Allocation Workbench</h1>
+        <p class="subtitle">Multithreaded task execution, deadlock avoidance, scheduling and memory allocation.</p>
+      </div>
+      <div class="header-meta">
+        <nav class="workspace-nav" aria-label="Workbench menu">
+          <button type="button" class="workspace-tab active" data-workspace="sample" aria-pressed="true">Sample example</button>
+          <button type="button" class="workspace-tab" data-workspace="custom" aria-pressed="false">Your example</button>
+        </nav>
+        <span class="tag">JSPM's RSCOE · Pune</span>
+        <span class="status-pill"><span class="status-dot"></span> Safe initial state</span>
+      </div>
+    </header>
+
+    <section id="customWorkspace" hidden>
+      <section class="card" style="margin-top:20px">
+        <div class="card-head">
+          <div>
+            <h2>Your own task scenario</h2>
+            <p class="section-note">Set system resources, memory partitions, and task claims. Run the same Banker, scheduling, and memory procedures without changing the report sample.</p>
+          </div>
+          <span class="tag">Custom scenario · independent of sample</span>
+        </div>
+        <div class="custom-config">
+          <div class="field"><label for="customTotalCpu">Total CPU cores</label><input id="customTotalCpu" type="number" min="1" step="1" value="4"></div>
+          <div class="field"><label for="customTotalRam">Total RAM buffers</label><input id="customTotalRam" type="number" min="1" step="1" value="6"></div>
+          <div class="field"><label for="customTotalIo">Total I/O channels</label><input id="customTotalIo" type="number" min="1" step="1" value="4"></div>
+          <div class="field"><label for="customPartitions">Memory partitions (KB, comma-separated)</label><input id="customPartitions" type="text" value="128, 256, 512, 1024"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:19px 0 10px">
+          <div><h3>Task definitions</h3><p class="section-note">Allocation is already held; Max claim is the task's total maximum demand.</p></div>
+          <span class="resource-chip">Need is calculated as Max − Allocation</span>
+        </div>
+        <div id="customTaskList" class="custom-task-list"></div>
+        <div class="custom-actions">
+          <div>
+            <button type="button" class="btn secondary" id="addCustomTask">Add task</button>
+            <button type="button" class="btn secondary" id="resetCustomExample">Load starter data</button>
+          </div>
+          <button type="button" class="btn" id="runCustomScenario">Run all procedures</button>
+        </div>
+        <div class="form-message" id="customFormMessage" role="alert"></div>
+      </section>
+
+      <section id="customResults" class="custom-results" aria-live="polite">
+        <div class="custom-metrics">
+          <article class="metric"><div class="metric-label">Available · CPU / RAM / I/O</div><div class="metric-value" id="customAvailable">—</div><div class="metric-note">After current allocations</div></article>
+          <article class="metric"><div class="metric-label">Banker safety</div><div class="metric-value" id="customSafetySummary">—</div><div class="metric-note" id="customSafetyNote">Calculated from the custom claims</div></article>
+          <article class="metric"><div class="metric-label">Scheduling makespan</div><div class="metric-value" id="customMakespan">—</div><div class="metric-note" id="customScheduleNote">Non-preemptive single-CPU schedule</div></article>
+        </div>
+        <div class="custom-result-grid">
+          <div class="stack">
+            <section class="card">
+              <div class="card-head"><div><h2>Banker's algorithm · custom state</h2><p class="section-note">At each step, find a task with Need ≤ Work; when it finishes, add its allocation back to Work.</p></div></div>
+              <div class="resource-line" id="customResourceTotals"></div>
+              <div class="table-wrap"><table class="matrix-table">
+                <thead><tr><th>Task</th><th>Allocation</th><th>Max claim</th><th>Need</th></tr></thead>
+                <tbody id="customBankerTable"></tbody>
+              </table></div>
+              <div class="safety-bar" id="customSafetyResult"><span>Run scenario to evaluate.</span><span id="customSafeSequence" class="sequence"></span></div>
+              <h3>Safety sequence trace</h3><div class="trace" id="customSafetyTrace" style="margin-top:9px"></div>
+              <div style="border-top:1px solid var(--line);margin-top:17px;padding-top:14px">
+                <h3>Test a resource request</h3>
+                <p class="section-note">A request is granted only if it stays within Need and Available and leaves a safe state.</p>
+                <div class="custom-inline-fields">
+                  <div class="field"><label for="customRequestTask">Task</label><select id="customRequestTask"></select></div>
+                  <div class="field"><label for="customRequestCpu">CPU</label><input id="customRequestCpu" type="number" min="0" value="0"></div>
+                  <div class="field"><label for="customRequestRam">RAM</label><input id="customRequestRam" type="number" min="0" value="0"></div>
+                  <div class="field"><label for="customRequestIo">I/O</label><input id="customRequestIo" type="number" min="0" value="0"></div>
+                  <button type="button" class="btn" id="checkCustomRequest">Check request</button>
+                </div>
+                <div class="request-outcome" id="customRequestOutcome" role="status"></div>
+              </div>
+            </section>
+            <section class="card">
+              <div class="card-head">
+                <div><h2>CPU scheduling</h2><p class="section-note">Run the entered arrival, burst, and priority values through a non-preemptive schedule.</p></div>
+                <div class="segmented" role="group" aria-label="Custom scheduling policy">
+                  <button type="button" class="segment active" data-custom-policy="FCFS">FCFS</button>
+                  <button type="button" class="segment" data-custom-policy="SJF">SJF</button>
+                  <button type="button" class="segment" data-custom-policy="Priority">Priority + aging</button>
+                </div>
+              </div>
+              <div class="resource-line" id="customScheduleSummary"></div>
+              <div class="gantt" id="customGanttChart"></div><div class="axis" id="customGanttAxis"></div>
+              <div class="table-wrap" style="margin-top:14px"><table>
+                <thead><tr><th>Task</th><th>Start</th><th>Completion</th><th>Effective pri</th><th>TAT</th><th>WT</th></tr></thead>
+                <tbody id="customScheduleTable"></tbody>
+              </table></div>
+            </section>
+          </div>
+          <aside class="stack">
+            <section class="card">
+              <div class="card-head">
+                <div><h2>Memory allocation</h2><p class="section-note">Apply the selected fit policy to each task's requested memory.</p></div>
+                <div class="segmented" role="group" aria-label="Custom memory fit policy">
+                  <button type="button" class="segment active" data-custom-fit="Best Fit">Best Fit</button>
+                  <button type="button" class="segment" data-custom-fit="First Fit">First Fit</button>
+                </div>
+              </div>
+              <div class="resource-line" id="customPartitionSummary"></div>
+              <div class="memory-list" id="customMemoryResults"></div>
+              <p class="footnote" id="customMemoryNote"></p>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </section>
+
+    <div id="sampleWorkspace">
+    <section class="metrics" aria-label="System summary">
+      <article class="metric">
+        <div class="metric-label">Available · CPU / RAM / I/O</div>
+        <div class="metric-value" id="availableSummary">—</div>
+        <div class="metric-note">Unallocated resource units</div>
+      </article>
+      <article class="metric">
+        <div class="metric-label">Active tasks</div>
+        <div class="metric-value" id="taskSummary">—</div>
+        <div class="metric-note">Each task has a current allocation</div>
+      </article>
+      <article class="metric">
+        <div class="metric-label">Safe sequence</div>
+        <div class="metric-value" id="sequenceSummary">—</div>
+        <div class="metric-note">Execution order from the safety check</div>
+      </article>
+      <article class="metric">
+        <div class="metric-label">Reported speedup</div>
+        <div class="metric-value" id="speedupSummary">—</div>
+        <div class="metric-note">4-worker run vs sequential baseline</div>
+      </article>
+    </section>
+
+    <div class="layout">
+      <div class="stack">
+        <section class="card" aria-labelledby="bankerTitle">
+          <div class="card-head">
+            <div>
+              <h2 id="bankerTitle">Banker's algorithm · current state</h2>
+              <p class="section-note">Given workload and current allocations. Need = Max claim - Allocation; safety check starts with Work = Available.</p>
+            </div>
+            <button type="button" class="btn secondary" id="runSafety">Recheck safety</button>
+          </div>
+          <div class="resource-line" id="resourceTotals"></div>
+          <div class="table-wrap">
+            <table class="matrix-table">
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Allocation<br><span class="resource-head">(CPU, RAM, I/O)</span></th>
+                  <th>Max claim<br><span class="resource-head">(CPU, RAM, I/O)</span></th>
+                  <th>Need<br><span class="resource-head">(CPU, RAM, I/O)</span></th>
+                  <th>AT</th>
+                  <th>BT</th>
+                  <th>Base pri</th>
+                  <th>Memory</th>
+                </tr>
+              </thead>
+              <tbody id="bankerTable"></tbody>
+            </table>
+          </div>
+          <div class="safety-bar" id="safetyResult" role="status">
+            <span>Evaluating safe state…</span>
+            <span id="safeSequence" class="sequence"></span>
+          </div>
+          <h3>Safety sequence trace</h3>
+          <div class="trace" id="safetyTrace" style="margin-top:9px"></div>
+
+          <div style="border-top:1px solid var(--line);margin-top:17px;padding-top:14px">
+            <div class="card-head" style="margin-bottom:10px">
+              <div>
+                <h3>Test a resource request</h3>
+                <p class="section-note">The request is tentatively allocated, then checked; unsafe requests are rolled back.</p>
+              </div>
+              <button type="button" class="btn secondary" id="unsafePreset">Load unsafe example</button>
+            </div>
+            <div class="request-form">
+              <div class="field">
+                <label for="requestTask">Task</label>
+                <select id="requestTask"></select>
+              </div>
+              <div class="field">
+                <label for="requestCpu">CPU</label>
+                <input id="requestCpu" type="number" min="0" value="0">
+              </div>
+              <div class="field">
+                <label for="requestRam">RAM</label>
+                <input id="requestRam" type="number" min="0" value="0">
+              </div>
+              <div class="field">
+                <label for="requestIo">I/O</label>
+                <input id="requestIo" type="number" min="0" value="0">
+              </div>
+              <button type="button" class="btn" id="checkRequest">Check request</button>
+            </div>
+            <div class="request-outcome" id="requestOutcome" role="status"></div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="scheduleTitle">
+          <div class="card-head">
+            <div>
+              <h2 id="scheduleTitle">CPU scheduling</h2>
+              <p class="section-note">Non-preemptive; lower priority number wins, aging improves it by one level per 100 ms waited.</p>
+            </div>
+            <div class="segmented" role="group" aria-label="Scheduling policy">
+              <button type="button" class="segment active" data-policy="FCFS">FCFS</button>
+              <button type="button" class="segment" data-policy="SJF">SJF</button>
+              <button type="button" class="segment" data-policy="Priority">Priority + aging</button>
+            </div>
+          </div>
+          <div class="resource-line" id="scheduleSummary"></div>
+          <div class="gantt" id="ganttChart"></div>
+          <div class="axis" id="ganttAxis"></div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table>
+              <thead><tr><th>Task</th><th>Start</th><th>Completion</th><th>Effective Pri</th><th>TAT</th><th>WT</th></tr></thead>
+              <tbody id="scheduleTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <aside class="stack">
+        <section class="card" aria-labelledby="memoryTitle">
+          <div class="card-head">
+            <div>
+              <h2 id="memoryTitle">Contiguous memory allocation</h2>
+              <p class="section-note">Four report partitions; each active task occupies one fitting block.</p>
+            </div>
+            <div class="segmented" role="group" aria-label="Memory allocation strategy">
+              <button type="button" class="segment active" data-fit="Best Fit">Best Fit</button>
+              <button type="button" class="segment" data-fit="First Fit">First Fit</button>
+            </div>
+          </div>
+          <div class="resource-line" id="partitionSummary"></div>
+          <div class="memory-list" id="memoryResults"></div>
+          <p class="footnote" id="memoryNote"></p>
+        </section>
+
+        <section class="card" aria-labelledby="benchmarkTitle">
+          <div class="card-head">
+            <div>
+              <h2 id="benchmarkTitle">Project benchmark</h2>
+              <p class="section-note">Reported comparison: sequential vs multithreaded execution.</p>
+            </div>
+          </div>
+          <div class="benchmark-grid" id="benchmarkResults">
+            <div class="benchmark-item" style="grid-column:1/-1"><span>Benchmark data</span><strong>Loading…</strong></div>
+          </div>
+          <p class="footnote">Values are the observations documented in PROJECT_REPORT.md.</p>
+        </section>
+
+        <section class="card" aria-labelledby="threadTitle">
+          <div class="card-head">
+            <div>
+              <h2 id="threadTitle">Execution model</h2>
+              <p class="section-note">Workers share a synchronized ready queue and resource manager.</p>
+            </div>
+          </div>
+          <div class="resource-line">
+            <span class="resource-chip">3 worker threads</span>
+            <span class="resource-chip">Mutex-protected queue</span>
+            <span class="resource-chip">Condition-variable waits</span>
+          </div>
+          <p class="section-note">On completion, a worker releases its resources and memory block, then waiting work can proceed.</p>
+        </section>
+      </aside>
+    </div>
+
+    <footer class="system-note">
+      <span><strong>Scenario:</strong> report task set T0–T4 with a populated allocation matrix and safe initial state.</span>
+      <span>Resource units: CPU cores · RAM buffers · I/O channels</span>
+    </footer>
+    </div>
+  </main>
+
+  <script>
+    const tasks = {{ default_tasks | tojson }};
+    const totalResources = {{ total_resources | tojson }};
+    const memoryPartitions = {{ memory_partitions | tojson }};
+    const resourceNames = ["CPU", "RAM", "I/O"];
+    const allocations = tasks.map(task => task.allocation.slice());
+    const maximums = tasks.map(task => task.max_resources.slice());
+    const needs = maximums.map((row, i) => row.map((value, j) => value - allocations[i][j]));
+    const allocatedTotals = resourceNames.map((_, j) => allocations.reduce((sum, row) => sum + row[j], 0));
+    const available = totalResources.map((value, j) => value - allocatedTotals[j]);
+
+    function vectorMarkup(values, extraClass = "") {
+      return `<span class="vector ${extraClass}">${values.map(value => `<span>${value}</span>`).join("")}</span>`;
+    }
+
+    function safetyCheck(workStart, allocationMatrix, needMatrix) {
+      const work = workStart.slice();
+      const finished = Array(tasks.length).fill(false);
+      const sequence = [];
+      const trace = [];
+
+      while (sequence.length < tasks.length) {
+        const index = tasks.findIndex((_, i) =>
+          !finished[i] && needMatrix[i].every((need, j) => need <= work[j])
+        );
+        if (index === -1) break;
+        const before = work.slice();
+        work.splice(0, work.length, ...work.map((value, j) => value + allocationMatrix[index][j]));
+        finished[index] = true;
+        sequence.push(index);
+        trace.push({ index, before, need: needMatrix[index].slice(), after: work.slice() });
+      }
+
+      return { safe: sequence.length === tasks.length, sequence, trace, work, finished };
+    }
+
+    function renderMatrix() {
+      document.getElementById("resourceTotals").innerHTML =
+        `<span class="resource-chip">Total ${vectorMarkup(totalResources)}</span>` +
+        `<span class="resource-chip">Allocated ${vectorMarkup(allocatedTotals)}</span>` +
+        `<span class="resource-chip">Available ${vectorMarkup(available)}</span>`;
+      document.getElementById("availableSummary").textContent = available.join(" / ");
+      document.getElementById("taskSummary").textContent = `${tasks.length} tasks`;
+
+      document.getElementById("bankerTable").innerHTML = tasks.map((task, i) => `
+        <tr>
+          <td class="task-label">${task.name}</td>
+          <td>${vectorMarkup(allocations[i])}</td>
+          <td>${vectorMarkup(maximums[i])}</td>
+          <td class="need-value">${vectorMarkup(needs[i])}</td>
+          <td>${task.arrival_time}</td>
+          <td>${task.burst_time}</td>
+          <td>${task.priority}</td>
+          <td>${task.memory_required} KB</td>
+        </tr>`).join("");
+      document.getElementById("requestTask").innerHTML = tasks.map((task, i) =>
+        `<option value="${i}">${task.name}</option>`).join("");
+      renderSafety();
+    }
+
+    function renderSafety() {
+      const result = safetyCheck(available, allocations, needs);
+      const banner = document.getElementById("safetyResult");
+      banner.classList.toggle("unsafe", !result.safe);
+      banner.firstElementChild.textContent = result.safe ? "SAFE · all tasks can complete" : "UNSAFE · no complete sequence";
+      document.getElementById("safeSequence").innerHTML = result.sequence.map((index, i) =>
+        `${i ? '<span class="arrow">→</span>' : ""}<span class="sequence-item">${tasks[index].name}</span>`).join("");
+      document.getElementById("sequenceSummary").textContent = result.safe
+        ? result.sequence.map(index => tasks[index].name).join(" → ")
+        : "Unsafe";
+      document.getElementById("safetyTrace").innerHTML = result.trace.map((step, i) => `
+        <div class="trace-step">
+          <span class="step-number">${i + 1}</span>
+          <div class="trace-copy">
+            <strong>${tasks[step.index].name} can finish: Need ${step.need.join(", ")} ≤ Work ${step.before.join(", ")}</strong>
+            <span>Release Allocation ${allocations[step.index].join(", ")} → Work becomes ${step.after.join(", ")}</span>
+          </div>
+        </div>`).join("") || `<div class="trace-step"><span class="trace-copy">No task can finish with the available resources.</span></div>`;
+    }
+
+    function showRequestOutcome(message, denied) {
+      const output = document.getElementById("requestOutcome");
+      output.className = `request-outcome show${denied ? " denied" : ""}`;
+      output.textContent = message;
+    }
+
+    function checkRequest() {
+      const index = Number(document.getElementById("requestTask").value);
+      const requestInputs = ["requestCpu", "requestRam", "requestIo"].map(id => document.getElementById(id));
+      const request = requestInputs.map(input => Number(input.value));
+      const task = tasks[index];
+      if (requestInputs.some(input => input.value.trim() === "") ||
+          request.some(value => !Number.isInteger(value) || value < 0)) {
+        showRequestOutcome("Request values must be non-negative whole numbers.", true);
+        return;
+      }
+      if (request.some((value, j) => value > needs[index][j])) {
+        showRequestOutcome(`Denied: the request exceeds ${task.name}'s remaining Need ${needs[index].join(", ")}.`, true);
+        return;
+      }
+      if (request.some((value, j) => value > available[j])) {
+        showRequestOutcome(`Wait: the request exceeds Available ${available.join(", ")}. No allocation was made.`, true);
+        return;
+      }
+      const tentativeAvailable = available.map((value, j) => value - request[j]);
+      const tentativeAllocations = allocations.map(row => row.slice());
+      const tentativeNeeds = needs.map(row => row.slice());
+      tentativeAllocations[index] = tentativeAllocations[index].map((value, j) => value + request[j]);
+      tentativeNeeds[index] = tentativeNeeds[index].map((value, j) => value - request[j]);
+      const result = safetyCheck(tentativeAvailable, tentativeAllocations, tentativeNeeds);
+      if (!result.safe) {
+        const blocked = tasks.filter((_, i) => !result.finished[i]).map(task => task.name).join(", ");
+        showRequestOutcome(
+          `DENIED · unsafe state. After tentative request ${request.join(", ")}, Available would be ${tentativeAvailable.join(", ")}; remaining tasks ${blocked} cannot finish. Allocation rolled back.`,
+          true
+        );
+        return;
+      }
+      showRequestOutcome(
+        `GRANTED · safe sequence after the request: ${result.sequence.map(i => tasks[i].name).join(" → ")}. Available would be ${tentativeAvailable.join(", ")}.`,
+        false
+      );
+    }
+
+    function renderSchedule(policy) {
+      const pending = tasks.map((task, index) => ({ ...task, index }));
+      const scheduled = [];
+      let clock = 0;
+      while (pending.length) {
+        const ready = pending.filter(task => task.arrival_time <= clock);
+        if (!ready.length) {
+          clock = Math.min(...pending.map(task => task.arrival_time));
+          continue;
+        }
+        ready.sort((a, b) => {
+          if (policy === "SJF") return a.burst_time - b.burst_time || a.arrival_time - b.arrival_time || a.task_id - b.task_id;
+          if (policy === "Priority") {
+            const aEffective = a.priority - Math.floor((clock - a.arrival_time) / 100);
+            const bEffective = b.priority - Math.floor((clock - b.arrival_time) / 100);
+            return aEffective - bEffective || a.arrival_time - b.arrival_time || a.task_id - b.task_id;
+          }
+          return a.arrival_time - b.arrival_time || a.task_id - b.task_id;
+        });
+        const task = ready[0];
+        pending.splice(pending.findIndex(item => item.index === task.index), 1);
+        const start = clock;
+        const completion = start + task.burst_time;
+        scheduled.push({
+          ...task,
+          start,
+          completion,
+          effectivePriority: policy === "Priority" ? task.priority - Math.floor((start - task.arrival_time) / 100) : "—",
+          tat: completion - task.arrival_time,
+          wt: completion - task.arrival_time - task.burst_time
+        });
+        clock = completion;
+      }
+      const end = Math.max(...scheduled.map(row => row.completion));
+      document.getElementById("scheduleSummary").innerHTML =
+        `<span class="resource-chip">${policy}</span>` +
+        `<span class="resource-chip">Makespan ${end} ms</span>` +
+        `<span class="resource-chip">Avg WT ${(scheduled.reduce((sum, row) => sum + row.wt, 0) / scheduled.length).toFixed(1)} ms</span>`;
+      document.getElementById("ganttChart").innerHTML = scheduled.map(row => {
+        const left = row.start / end * 100;
+        const width = row.burst_time / end * 100;
+        return `<div class="gantt-row">
+          <span class="gantt-name">${row.name}</span>
+          <div class="gantt-track"><span class="gantt-bar" style="left:${left}%;width:${width}%">${row.burst_time} ms</span></div>
+          <span class="gantt-time">${row.completion}</span>
+        </div>`;
+      }).join("");
+      document.getElementById("ganttAxis").innerHTML = `<span>0 ms</span><span>${end} ms</span>`;
+      document.getElementById("scheduleTable").innerHTML = scheduled.map(row => `
+        <tr><td class="task-label">${row.name}</td><td>${row.start} ms</td><td>${row.completion} ms</td><td>${row.effectivePriority}</td><td>${row.tat} ms</td><td>${row.wt} ms</td></tr>
+      `).join("");
+    }
+
+    function renderMemory(policy) {
+      const blocks = memoryPartitions.map((size, index) => ({ id: index + 1, size, used: false }));
+      const results = tasks.map(task => {
+        const candidates = blocks.filter(block => !block.used && block.size >= task.memory_required);
+        let block;
+        if (policy === "Best Fit") {
+          block = candidates.sort((a, b) => a.size - b.size)[0];
+        } else {
+          block = candidates[0];
+        }
+        if (block) block.used = true;
+        return { task, block };
+      });
+      document.getElementById("partitionSummary").innerHTML = memoryPartitions.map((size, i) =>
+        `<span class="resource-chip">Block ${i + 1} · ${size} KB</span>`).join("");
+      document.getElementById("memoryResults").innerHTML = results.map(({ task, block }) => `
+        <div class="memory-row">
+          <span class="memory-task">${task.name}</span>
+          <span class="memory-detail"><strong>${task.memory_required} KB requested${block ? ` · Block ${block.id} (${block.size} KB)` : ""}</strong>
+          <span>${block ? `${block.size - task.memory_required} KB internal fragmentation` : "Waiting: no free partition large enough"}</span></span>
+          <span class="memory-status${block ? "" : " wait"}">${block ? "ALLOCATED" : "WAITING"}</span>
+        </div>`).join("");
+      document.getElementById("memoryNote").textContent =
+        `${policy} selects a free partition for each task in arrival order. The selected block stays occupied until completion. With ascending partition sizes, both policies select the same blocks for this workload.`;
+    }
+
+    const starterCustomTasks = [
+      { name: "A", arrival_time: 0, burst_time: 5, priority: 2, memory_required: 180, allocation: [1, 0, 0], max_resources: [2, 2, 1] },
+      { name: "B", arrival_time: 1, burst_time: 3, priority: 1, memory_required: 300, allocation: [0, 1, 1], max_resources: [1, 3, 2] },
+      { name: "C", arrival_time: 2, burst_time: 4, priority: 3, memory_required: 450, allocation: [0, 0, 1], max_resources: [2, 1, 2] }
+    ];
+    let customScenario = null;
+    let customPolicy = "FCFS";
+    let customFitPolicy = "Best Fit";
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, character => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[character]);
+    }
+
+    function setCustomMessage(message, isError = true) {
+      const output = document.getElementById("customFormMessage");
+      output.textContent = message;
+      output.className = `form-message show${isError ? "" : " notice"}`;
+    }
+
+    function markCustomDirty() {
+      customScenario = null;
+      document.getElementById("customResults").hidden = true;
+      document.getElementById("customRequestOutcome").className = "request-outcome";
+      setCustomMessage("Your changes are not applied yet. Run all procedures to update the results.", false);
+    }
+
+    function addCustomTask(values = {}) {
+      const list = document.getElementById("customTaskList");
+      if (list.children.length >= 20) {
+        setCustomMessage("A custom scenario can contain at most 20 tasks.");
+        return;
+      }
+      const index = list.children.length + 1;
+      const card = document.createElement("section");
+      card.className = "custom-task-card";
+      const heading = document.createElement("div");
+      heading.className = "custom-task-head";
+      const title = document.createElement("strong");
+      title.textContent = `Task ${index}`;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn secondary";
+      remove.textContent = "Remove";
+      remove.addEventListener("click", () => {
+        card.remove();
+        Array.from(list.children).forEach((taskCard, taskIndex) => {
+          taskCard.querySelector(".custom-task-head strong").textContent = `Task ${taskIndex + 1}`;
+        });
+        markCustomDirty();
+      });
+      heading.append(title, remove);
+      const grid = document.createElement("div");
+      grid.className = "custom-task-grid";
+      const fields = [
+        ["name", "Task name", values.name || `T${index - 1}`, "text"],
+        ["arrival_time", "Arrival time (ms)", values.arrival_time ?? 0, "number"],
+        ["burst_time", "Burst time (ms)", values.burst_time ?? 1, "number"],
+        ["priority", "Priority (1 is highest)", values.priority ?? 1, "number"],
+        ["memory_required", "Memory (KB)", values.memory_required ?? 128, "number"],
+        ["alloc_cpu", "Allocated CPU", values.allocation?.[0] ?? 0, "number"],
+        ["alloc_ram", "Allocated RAM", values.allocation?.[1] ?? 0, "number"],
+        ["alloc_io", "Allocated I/O", values.allocation?.[2] ?? 0, "number"],
+        ["max_cpu", "Max CPU claim", values.max_resources?.[0] ?? 1, "number"],
+        ["max_ram", "Max RAM claim", values.max_resources?.[1] ?? 1, "number"],
+        ["max_io", "Max I/O claim", values.max_resources?.[2] ?? 1, "number"]
+      ];
+      fields.forEach(([key, labelText, value, type]) => {
+        const field = document.createElement("div");
+        field.className = "field";
+        const label = document.createElement("label");
+        label.textContent = labelText;
+        const input = document.createElement("input");
+        input.type = type;
+        input.dataset.field = key;
+        input.value = value;
+        if (type === "number") {
+          input.min = key === "arrival_time" || key.startsWith("alloc_") ? "0" : "1";
+          input.step = "1";
+        }
+        input.addEventListener("input", markCustomDirty);
+        label.append(input);
+        field.append(label);
+        grid.append(field);
+      });
+      card.append(heading, grid);
+      list.append(card);
+      markCustomDirty();
+    }
+
+    function readCustomScenario() {
+      const numberFrom = (id, label, min = 0) => {
+        const input = document.getElementById(id);
+        const value = Number(input.value);
+        if (input.value.trim() === "" || !Number.isSafeInteger(value) || value < min) {
+          throw new Error(`${label} must be a whole number of at least ${min}.`);
+        }
+        return value;
+      };
+      const totals = [
+        numberFrom("customTotalCpu", "Total CPU cores", 1),
+        numberFrom("customTotalRam", "Total RAM buffers", 1),
+        numberFrom("customTotalIo", "Total I/O channels", 1)
+      ];
+      const rawPartitions = document.getElementById("customPartitions").value.trim();
+      const partitions = rawPartitions.split(",").map(value => Number(value.trim()));
+      if (!rawPartitions || partitions.some(value => !Number.isSafeInteger(value) || value <= 0)) {
+        throw new Error("Memory partitions must be positive whole KB sizes separated by commas.");
+      }
+      if (new Set(partitions).size !== partitions.length) {
+        throw new Error("Memory partition sizes must be unique.");
+      }
+      const cards = Array.from(document.querySelectorAll("#customTaskList .custom-task-card"));
+      if (!cards.length) throw new Error("Add at least one task to run the procedures.");
+      const scenarioTasks = cards.map((card, index) => {
+        const fields = Object.fromEntries(Array.from(card.querySelectorAll("[data-field]"))
+          .map(input => [input.dataset.field, input]));
+        const name = fields.name.value.trim();
+        if (!name || name.length > 16) throw new Error(`Task ${index + 1} needs a name of 1–16 characters.`);
+        const readField = (key, label, min = 0) => {
+          const input = fields[key];
+          const value = Number(input.value);
+          if (input.value.trim() === "" || !Number.isSafeInteger(value) || value < min) {
+            throw new Error(`${name}: ${label} must be a whole number of at least ${min}.`);
+          }
+          return value;
+        };
+        const allocation = [
+          readField("alloc_cpu", "allocated CPU"),
+          readField("alloc_ram", "allocated RAM"),
+          readField("alloc_io", "allocated I/O")
+        ];
+        const maxResources = [
+          readField("max_cpu", "maximum CPU claim"),
+          readField("max_ram", "maximum RAM claim"),
+          readField("max_io", "maximum I/O claim")
+        ];
+        allocation.forEach((value, resource) => {
+          if (value > maxResources[resource]) {
+            throw new Error(`${name}: allocation cannot exceed its maximum ${["CPU", "RAM", "I/O"][resource]} claim.`);
+          }
+          if (maxResources[resource] > totals[resource]) {
+            throw new Error(`${name}: maximum ${["CPU", "RAM", "I/O"][resource]} claim exceeds the system total.`);
+          }
+        });
+        return {
+          name,
+          arrival_time: readField("arrival_time", "arrival time"),
+          burst_time: readField("burst_time", "burst time", 1),
+          priority: readField("priority", "priority", 1),
+          memory_required: readField("memory_required", "memory requirement", 1),
+          allocation,
+          max_resources: maxResources
+        };
+      });
+      const names = scenarioTasks.map(task => task.name.toLowerCase());
+      if (new Set(names).size !== names.length) throw new Error("Task names must be unique.");
+      const allocated = totals.map((_, resource) =>
+        scenarioTasks.reduce((sum, task) => sum + task.allocation[resource], 0));
+      if (allocated.some((value, resource) => value > totals[resource])) {
+        throw new Error("The sum of current task allocations exceeds the system resource total.");
+      }
+      return {
+        totals,
+        partitions,
+        tasks: scenarioTasks,
+        allocated,
+        available: totals.map((value, resource) => value - allocated[resource]),
+        needs: scenarioTasks.map(task => task.max_resources.map((value, resource) => value - task.allocation[resource]))
+      };
+    }
+
+    function customSafetyCheck(scenario, requestIndex = -1, request = [0, 0, 0]) {
+      const work = scenario.available.map((value, resource) => value - (requestIndex === -1 ? 0 : request[resource]));
+      const taskAllocations = scenario.tasks.map((task, index) =>
+        task.allocation.map((value, resource) => value + (index === requestIndex ? request[resource] : 0)));
+      const taskNeeds = scenario.needs.map((need, index) =>
+        need.map((value, resource) => value - (index === requestIndex ? request[resource] : 0)));
+      const finished = Array(scenario.tasks.length).fill(false);
+      const sequence = [];
+      const trace = [];
+      while (sequence.length < scenario.tasks.length) {
+        const index = scenario.tasks.findIndex((_, taskIndex) =>
+          !finished[taskIndex] && taskNeeds[taskIndex].every((need, resource) => need <= work[resource]));
+        if (index === -1) break;
+        const before = work.slice();
+        work.splice(0, work.length, ...work.map((value, resource) => value + taskAllocations[index][resource]));
+        finished[index] = true;
+        sequence.push(index);
+        trace.push({ index, before, need: taskNeeds[index], allocation: taskAllocations[index], after: work.slice() });
+      }
+      return { safe: sequence.length === scenario.tasks.length, sequence, trace, finished, remaining: scenario.tasks.map((_, index) => index).filter(index => !finished[index]) };
+    }
+
+    function renderCustomSafety(scenario) {
+      const result = customSafetyCheck(scenario);
+      const banner = document.getElementById("customSafetyResult");
+      banner.classList.toggle("unsafe", !result.safe);
+      banner.firstElementChild.textContent = result.safe ? "SAFE · all tasks can complete" : "UNSAFE · no complete sequence";
+      document.getElementById("customSafeSequence").innerHTML = result.sequence.map((index, i) =>
+        `${i ? '<span class="arrow">→</span>' : ""}<span class="sequence-item">${escapeHtml(scenario.tasks[index].name)}</span>`).join("");
+      document.getElementById("customSafetySummary").textContent = result.safe ? "SAFE" : "UNSAFE";
+      document.getElementById("customSafetyNote").textContent = result.safe
+        ? `Safe sequence: ${result.sequence.map(index => scenario.tasks[index].name).join(" → ")}`
+        : `${result.sequence.length} of ${scenario.tasks.length} tasks can complete before Work is insufficient.`;
+      document.getElementById("customSafetyTrace").innerHTML = result.trace.map((step, index) => `
+        <div class="trace-step"><span class="step-number">${index + 1}</span><div class="trace-copy">
+          <strong>${escapeHtml(scenario.tasks[step.index].name)}: Need ${step.need.join(", ")} ≤ Work ${step.before.join(", ")}</strong>
+          <span>Release Allocation ${step.allocation.join(", ")} → Work becomes ${step.after.join(", ")}</span>
+        </div></div>`).join("") || `<div class="trace-step"><span class="trace-copy">No task can finish with the currently available resources.</span></div>`;
+    }
+
+    function renderCustomSchedule() {
+      if (!customScenario) return;
+      const pending = customScenario.tasks.map((task, index) => ({ ...task, index }));
+      const scheduled = [];
+      let clock = 0;
+      while (pending.length) {
+        const ready = pending.filter(task => task.arrival_time <= clock);
+        if (!ready.length) {
+          clock = Math.min(...pending.map(task => task.arrival_time));
+          continue;
+        }
+        ready.sort((a, b) => {
+          if (customPolicy === "SJF") return a.burst_time - b.burst_time || a.arrival_time - b.arrival_time || a.index - b.index;
+          if (customPolicy === "Priority") {
+            const aPriority = a.priority - Math.floor((clock - a.arrival_time) / 100);
+            const bPriority = b.priority - Math.floor((clock - b.arrival_time) / 100);
+            return aPriority - bPriority || a.arrival_time - b.arrival_time || a.index - b.index;
+          }
+          return a.arrival_time - b.arrival_time || a.index - b.index;
+        });
+        const task = ready[0];
+        pending.splice(pending.findIndex(item => item.index === task.index), 1);
+        const start = clock;
+        const completion = start + task.burst_time;
+        scheduled.push({
+          ...task, start, completion,
+          effectivePriority: customPolicy === "Priority" ? task.priority - Math.floor((start - task.arrival_time) / 100) : "—",
+          tat: completion - task.arrival_time,
+          wt: completion - task.arrival_time - task.burst_time
+        });
+        clock = completion;
+      }
+      const makespan = Math.max(...scheduled.map(row => row.completion));
+      const averageWaiting = scheduled.reduce((sum, row) => sum + row.wt, 0) / scheduled.length;
+      document.getElementById("customMakespan").textContent = `${makespan} ms`;
+      document.getElementById("customScheduleNote").textContent = `${customPolicy} · Average WT ${averageWaiting.toFixed(1)} ms`;
+      document.getElementById("customScheduleSummary").innerHTML =
+        `<span class="resource-chip">${customPolicy === "Priority" ? "Priority + aging" : customPolicy}</span>` +
+        `<span class="resource-chip">Makespan ${makespan} ms</span>` +
+        `<span class="resource-chip">Average WT ${averageWaiting.toFixed(1)} ms</span>`;
+      document.getElementById("customGanttChart").innerHTML = scheduled.map(row => `
+        <div class="gantt-row"><span class="gantt-name">${escapeHtml(row.name)}</span>
+          <div class="gantt-track"><span class="gantt-bar" style="left:${row.start / makespan * 100}%;width:${row.burst_time / makespan * 100}%">${row.burst_time} ms</span></div>
+          <span class="gantt-time">${row.completion}</span></div>`).join("");
+      document.getElementById("customGanttAxis").innerHTML = `<span>0 ms</span><span>${makespan} ms</span>`;
+      document.getElementById("customScheduleTable").innerHTML = scheduled.map(row => `
+        <tr><td class="task-label">${escapeHtml(row.name)}</td><td>${row.start} ms</td><td>${row.completion} ms</td><td>${row.effectivePriority}</td><td>${row.tat} ms</td><td>${row.wt} ms</td></tr>`).join("");
+    }
+
+    function renderCustomMemory() {
+      if (!customScenario) return;
+      const blocks = customScenario.partitions.map((size, index) => ({ id: index + 1, size, used: false }));
+      const orderedTasks = customScenario.tasks
+        .map((task, index) => ({ task, index }))
+        .sort((a, b) => a.task.arrival_time - b.task.arrival_time || a.index - b.index);
+      const results = orderedTasks.map(({ task }) => {
+        const candidates = blocks.filter(block => !block.used && block.size >= task.memory_required);
+        const block = customFitPolicy === "Best Fit"
+          ? candidates.sort((a, b) => a.size - b.size)[0]
+          : candidates[0];
+        if (block) block.used = true;
+        return { task, block };
+      });
+      document.getElementById("customPartitionSummary").innerHTML = blocks.map(block =>
+        `<span class="resource-chip">Block ${block.id} · ${block.size} KB</span>`).join("");
+      document.getElementById("customMemoryResults").innerHTML = results.map(({ task, block }) => `
+        <div class="memory-row"><span class="memory-task">${escapeHtml(task.name)}</span>
+          <span class="memory-detail"><strong>${task.memory_required} KB requested${block ? ` · Block ${block.id} (${block.size} KB)` : ""}</strong>
+          <span>${block ? `${block.size - task.memory_required} KB internal fragmentation` : "Waiting: no free partition large enough"}</span></span>
+          <span class="memory-status${block ? "" : " wait"}">${block ? "ALLOCATED" : "WAITING"}</span></div>`).join("");
+      document.getElementById("customMemoryNote").textContent =
+        `${customFitPolicy} assigns one free partition per task in arrival order; allocated blocks remain occupied for this scenario.`;
+    }
+
+    function runCustomScenario() {
+      try {
+        const scenario = readCustomScenario();
+        customScenario = scenario;
+        const vectors = values => `<span class="vector">${values.map(value => `<span>${value}</span>`).join("")}</span>`;
+        document.getElementById("customAvailable").textContent = scenario.available.join(" / ");
+        document.getElementById("customResourceTotals").innerHTML =
+          `<span class="resource-chip">Total ${vectors(scenario.totals)}</span>` +
+          `<span class="resource-chip">Allocated ${vectors(scenario.allocated)}</span>` +
+          `<span class="resource-chip">Available ${vectors(scenario.available)}</span>`;
+        document.getElementById("customBankerTable").innerHTML = scenario.tasks.map((task, index) => `
+          <tr><td class="task-label">${escapeHtml(task.name)}</td><td>${vectors(task.allocation)}</td>
+          <td>${vectors(task.max_resources)}</td><td class="need-value">${vectors(scenario.needs[index])}</td></tr>`).join("");
+        const selector = document.getElementById("customRequestTask");
+        selector.replaceChildren(...scenario.tasks.map((task, index) => {
+          const option = document.createElement("option");
+          option.value = index;
+          option.textContent = task.name;
+          return option;
+        }));
+        document.getElementById("customRequestOutcome").className = "request-outcome";
+        renderCustomSafety(scenario);
+        renderCustomSchedule();
+        renderCustomMemory();
+        document.getElementById("customResults").hidden = false;
+        const message = document.getElementById("customFormMessage");
+        message.className = "form-message";
+        message.textContent = "";
+      } catch (error) {
+        customScenario = null;
+        document.getElementById("customResults").hidden = true;
+        setCustomMessage(error.message);
+      }
+    }
+
+    function checkCustomRequest() {
+      if (!customScenario) {
+        setCustomMessage("Run all procedures before checking a resource request.");
+        return;
+      }
+      const index = Number(document.getElementById("customRequestTask").value);
+      const inputs = ["customRequestCpu", "customRequestRam", "customRequestIo"].map(id => document.getElementById(id));
+      const request = inputs.map(input => Number(input.value));
+      const task = customScenario.tasks[index];
+      const output = document.getElementById("customRequestOutcome");
+      const report = (message, denied) => {
+        output.textContent = message;
+        output.className = `request-outcome show${denied ? " denied" : ""}`;
+      };
+      if (inputs.some(input => input.value.trim() === "") ||
+          request.some(value => !Number.isSafeInteger(value) || value < 0)) {
+        report("Request values must be non-negative whole numbers.", true);
+        return;
+      }
+      if (request.some((value, resource) => value > customScenario.needs[index][resource])) {
+        report(`Denied: request exceeds ${task.name}'s remaining Need ${customScenario.needs[index].join(", ")}.`, true);
+        return;
+      }
+      if (request.some((value, resource) => value > customScenario.available[resource])) {
+        report(`Wait: request exceeds Available ${customScenario.available.join(", ")}. No resources were granted.`, true);
+        return;
+      }
+      const result = customSafetyCheck(customScenario, index, request);
+      if (!result.safe) {
+        const blocked = result.remaining.map(taskIndex => customScenario.tasks[taskIndex].name).join(", ");
+        report(`DENIED · unsafe state. Remaining tasks ${blocked} cannot finish after tentative Available ${customScenario.available.map((value, resource) => value - request[resource]).join(", ")}. Allocation rolled back.`, true);
+        return;
+      }
+      report(`GRANTED · safe sequence: ${result.sequence.map(taskIndex => customScenario.tasks[taskIndex].name).join(" → ")}.`, false);
+    }
+
+    function loadStarterCustomScenario() {
+      document.getElementById("customTotalCpu").value = 4;
+      document.getElementById("customTotalRam").value = 6;
+      document.getElementById("customTotalIo").value = 4;
+      document.getElementById("customPartitions").value = "128, 256, 512, 1024";
+      document.getElementById("customTaskList").replaceChildren();
+      starterCustomTasks.forEach(task => addCustomTask(task));
+      runCustomScenario();
+    }
+
+    document.querySelectorAll("[data-workspace]").forEach(button => button.addEventListener("click", () => {
+      const custom = button.dataset.workspace === "custom";
+      document.getElementById("sampleWorkspace").hidden = custom;
+      document.getElementById("customWorkspace").hidden = !custom;
+      document.querySelectorAll("[data-workspace]").forEach(tab => {
+        const selected = tab === button;
+        tab.classList.toggle("active", selected);
+        tab.setAttribute("aria-pressed", String(selected));
+      });
+    }));
+    document.getElementById("addCustomTask").addEventListener("click", () => addCustomTask());
+    document.getElementById("resetCustomExample").addEventListener("click", loadStarterCustomScenario);
+    document.getElementById("runCustomScenario").addEventListener("click", runCustomScenario);
+    document.getElementById("checkCustomRequest").addEventListener("click", checkCustomRequest);
+    ["customTotalCpu", "customTotalRam", "customTotalIo", "customPartitions"].forEach(id =>
+      document.getElementById(id).addEventListener("input", markCustomDirty));
+    document.querySelectorAll("[data-custom-policy]").forEach(button => button.addEventListener("click", () => {
+      customPolicy = button.dataset.customPolicy;
+      document.querySelectorAll("[data-custom-policy]").forEach(item => item.classList.toggle("active", item === button));
+      renderCustomSchedule();
+    }));
+    document.querySelectorAll("[data-custom-fit]").forEach(button => button.addEventListener("click", () => {
+      customFitPolicy = button.dataset.customFit;
+      document.querySelectorAll("[data-custom-fit]").forEach(item => item.classList.toggle("active", item === button));
+      renderCustomMemory();
+    }));
+
+    document.getElementById("runSafety").addEventListener("click", renderSafety);
+    document.getElementById("checkRequest").addEventListener("click", checkRequest);
+    document.getElementById("unsafePreset").addEventListener("click", () => {
+      document.getElementById("requestTask").value = "1";
+      document.getElementById("requestCpu").value = "0";
+      document.getElementById("requestRam").value = "0";
+      document.getElementById("requestIo").value = "1";
+      checkRequest();
+    });
+    document.querySelectorAll("[data-policy]").forEach(button => button.addEventListener("click", () => {
+      document.querySelectorAll("[data-policy]").forEach(item => item.classList.toggle("active", item === button));
+      renderSchedule(button.dataset.policy);
+    }));
+    document.querySelectorAll("[data-fit]").forEach(button => button.addEventListener("click", () => {
+      document.querySelectorAll("[data-fit]").forEach(item => item.classList.toggle("active", item === button));
+      renderMemory(button.dataset.fit);
+    }));
+
+    renderMatrix();
+    renderSchedule("FCFS");
+    renderMemory("Best Fit");
+    loadStarterCustomScenario();
+    fetch("/api/benchmark")
+      .then(response => {
+        if (!response.ok) throw new Error(`Benchmark request failed (${response.status})`);
+        return response.json();
+      })
+      .then(payload => {
+        const result = payload.results.find(item => item.workers === 4);
+        if (!result) throw new Error("Four-worker benchmark is missing.");
+        document.getElementById("speedupSummary").textContent = result.speedup;
+        document.getElementById("benchmarkResults").innerHTML = `
+          <div class="benchmark-item"><span>Sequential time</span><strong>${payload.results[0].total_time} ms</strong></div>
+          <div class="benchmark-item"><span>4-worker time</span><strong>${result.total_time} ms</strong></div>
+          <div class="benchmark-item"><span>Speedup</span><strong>${result.speedup}</strong></div>`;
+      })
+      .catch(error => {
+        document.getElementById("speedupSummary").textContent = "Unavailable";
+        document.getElementById("benchmarkResults").innerHTML =
+          `<div class="benchmark-item" style="grid-column:1/-1"><span>Benchmark data unavailable</span><strong>${error.message}</strong></div>`;
+      });
+  </script>
+</body>
+</html>
