@@ -32,6 +32,9 @@ python web\app.py
 Open `http://localhost:5000` to view the report-based dashboard with populated Banker's allocation data, request safety checks, scheduling policies, and memory-fit results.
 Use **Your example** in the top menu to enter custom resource totals, memory partitions, and task definitions. **Run all procedures** calculates the custom Banker's safety sequence, request checks, CPU schedule, and memory-fit allocations; **Sample example** returns to the unchanged report workload.
 
+### Deploy the Browser Workbench to Vercel
+Import this repository into Vercel and set the project root directory to the repository root. The root `vercel.json`, `api\index.py`, and `requirements.txt` configure Flask routing, serverless entry, and the Flask dependency. Redeploy after pushing changes.
+
 ### 4. Compile and Run the C++ Implementation
 On Linux (Ubuntu/Debian) or Windows MinGW:
 ```bash
